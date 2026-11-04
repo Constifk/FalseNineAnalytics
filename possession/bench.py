@@ -13,7 +13,7 @@ import time
 
 import numpy as np
 
-from . import devgames, features, methods, noise, score
+from . import devgames, features, methods, noise, score, tagging
 
 GRID = {
     "switch": (4.0, 8.0, 16.0, 32.0, 64.0),
@@ -22,7 +22,15 @@ GRID = {
 }
 
 
-def prepare(presets, seeds=(0,)):
+def add_tags(m, f, tags):
+    """Calibrate tag signs against the tracking-only v1 estimate, then add tag features."""
+    estimate = methods.v1_rules(m, f)
+    signs = tagging.calibrate_signs(tags, estimate)
+    f.update(tagging.features(tags, m.n_frames, signs))
+    return signs
+
+
+def prepare(presets, seeds=(0,), tags=False):
     """{(game, preset, seed): (noisy match, gt, features)}"""
     out = {}
     for g in devgames.DEV_GAMES:
@@ -30,9 +38,13 @@ def prepare(presets, seeds=(0,)):
         for p in presets:
             for s in seeds:
                 cfg = noise.PRESETS[p]
-                cfg = noise.NoiseConfig(**{**cfg.__dict__, "seed": s + 17 * devgames.DEV_GAMES.index(g)})
+                seed = s + 17 * devgames.DEV_GAMES.index(g)
+                cfg = noise.NoiseConfig(**{**cfg.__dict__, "seed": seed})
                 m = noise.degrade(clean, gt, cfg)
-                out[(g, p, s)] = (m, gt, features.compute(m))
+                f = features.compute(m)
+                if tags:
+                    add_tags(m, f, tagging.simulate(gt, m.runs, seed=seed))
+                out[(g, p, s)] = (m, gt, f)
     return out
 
 

@@ -108,6 +108,8 @@ def design(f):
         f["home_v"] - f["away_v"],
         (1 - seen) * f["wid_diff_3s"] / 5, (1 - seen) * f["x_diff_3s"] / 10,
     ]
+    if "tag_sp" in f:   # Smart Tagging evidence (tagging.py), when available
+        cols += [f["tag_sp"], f["tag_sp_team"], f["tag_phase"], (1 - seen) * f["tag_phase"]]
     return np.column_stack([np.nan_to_num(np.asarray(c, float)) for c in cols])
 
 
