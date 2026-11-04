@@ -9,6 +9,7 @@ BAR-ATH_broadcast_* -> data/broadcast/. Prints file names and sizes only, never 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sys
 import zipfile
@@ -21,6 +22,9 @@ def target_for(name):
     base = os.path.basename(name)
     if not base.startswith("BAR-ATH_"):
         return None
+    # Drive names big single-file downloads with a part number: BAR-ATH_tactical-002.mp4
+    stem, ext = os.path.splitext(base)
+    base = re.sub(r"-\d{3}$", "", stem) + ext
     sub = "broadcast" if "_broadcast" in base else "tactical"
     return os.path.join(DATA, sub, base)
 
