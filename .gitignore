@@ -62,3 +62,9 @@ __pycache__/
 venv/
 env/
 .DS_Store
+
+# -- team (yang/consti/sascha) -------------------------------------------------------------------
+# Open dev games (Metrica sample data etc.) are downloaded by script, never committed.
+devdata/
+out/
+HANDOFF.md
