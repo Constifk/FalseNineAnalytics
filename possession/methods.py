@@ -109,7 +109,7 @@ def design(f):
         (1 - seen) * f["wid_diff_3s"] / 5, (1 - seen) * f["x_diff_3s"] / 10,
     ]
     if "tag_sp" in f:   # Smart Tagging evidence (tagging.py), when available
-        cols += [f["tag_sp"], f["tag_sp_team"], f["tag_phase"], (1 - seen) * f["tag_phase"]]
+        cols += [f["tag_sp"], f["tag_sp_team"], (1 - seen) * f["tag_sp_team"]]
     return np.column_stack([np.nan_to_num(np.asarray(c, float)) for c in cols])
 
 
@@ -162,21 +162,48 @@ class DecodeParams:
 def viterbi(log_em, p: DecodeParams):
     """Most likely H/A/D path under per-frame emission scores and fixed transition costs."""
     n = len(log_em)
-    cost = np.array([[0, p.switch, p.stop],
-                     [p.switch, 0, p.stop],
-                     [p.start, p.start, 0]], float)
-    back = np.zeros((n, 3), np.int8)
-    score = log_em[0].copy()
+    sw, st, sa = float(p.switch), float(p.stop), float(p.start)
+    e0 = log_em[:, 0].tolist()
+    e1 = log_em[:, 1].tolist()
+    e2 = log_em[:, 2].tolist()
+    b0 = [0] * n
+    b1 = [0] * n
+    b2 = [0] * n
+    s0, s1, s2 = float(e0[0]), float(e1[0]), float(e2[0])
     for t in range(1, n):
-        cand = score[:, None] - cost          # from i (rows) to j (cols)
-        back[t] = np.argmax(cand, axis=0)
-        score = cand[back[t], np.arange(3)] + log_em[t]
-    path = np.zeros(n, np.int8)
-    path[-1] = int(np.argmax(score))
+        # to state 0 (H)
+        v0, v1, v2 = s0, s1 - sw, s2 - sa
+        if v0 >= v1 and v0 >= v2:
+            ns0, b0[t] = v0 + e0[t], 0
+        elif v1 >= v2:
+            ns0, b0[t] = v1 + e0[t], 1
+        else:
+            ns0, b0[t] = v2 + e0[t], 2
+        # to state 1 (A)
+        v0, v1, v2 = s0 - sw, s1, s2 - sa
+        if v1 >= v0 and v1 >= v2:
+            ns1, b1[t] = v1 + e1[t], 1
+        elif v0 >= v2:
+            ns1, b1[t] = v0 + e1[t], 0
+        else:
+            ns1, b1[t] = v2 + e1[t], 2
+        # to state 2 (D)
+        v0, v1, v2 = s0 - st, s1 - st, s2
+        if v2 >= v0 and v2 >= v1:
+            ns2, b2[t] = v2 + e2[t], 2
+        elif v0 >= v1:
+            ns2, b2[t] = v0 + e2[t], 0
+        else:
+            ns2, b2[t] = v1 + e2[t], 1
+        s0, s1, s2 = ns0, ns1, ns2
+    path = [0] * n
+    cur = 0 if (s0 >= s1 and s0 >= s2) else (1 if s1 >= s2 else 2)
+    path[n - 1] = cur
+    bs = (b0, b1, b2)
     for t in range(n - 1, 0, -1):
-        path[t - 1] = back[t, path[t]]
-    return path
-
+        cur = bs[cur][t]
+        path[t - 1] = cur
+    return np.asarray(path, np.int8)
 
 class V2:
     def __init__(self, decode: DecodeParams = DecodeParams(), clf: LogReg | None = None):

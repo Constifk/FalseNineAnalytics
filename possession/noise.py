@@ -28,14 +28,14 @@ from .match import AWAY, D, HOME, Match
 
 @dataclass
 class NoiseConfig:
-    ball_missing_alive: float = 0.35     # target share of live frames without a ball
-    ball_missing_dead: float = 0.60      # target share of dead frames without a ball
-    gap_median_frames: float = 12.0      # lognormal gap length, median
-    gap_sigma: float = 1.0
+    ball_missing_alive: float = 0.25     # target share of live frames without a ball
+    ball_missing_dead: float = 0.85      # target share of dead frames without a ball
+    gap_median_frames: float = 250.0     # lognormal gap length, median (~10 s, matching ATD q50=10.7s)
+    gap_sigma: float = 1.15
     crowd_boost: float = 3.0             # gap start rate x (1 + boost) when >= 2 players within 2 m
     air_boost: float = 2.0               # ... and x (1 + boost) when the ball moves > 15 m/s
-    ball_jitter_m: float = 0.25
-    player_jitter_m: float = 0.15
+    ball_jitter_m: float = 0.20
+    player_jitter_m: float = 0.04        # keeps q10/q50/q90 player speed matching real ATD (0.71/1.54/2.86)
     tracklet_mean_s: float = 30.0
     player_dropout: float = 0.07         # share of player-frames lost in bursts
     slots_per_team: int = 23
@@ -44,8 +44,8 @@ class NoiseConfig:
 
 PRESETS = {
     "mid":        NoiseConfig(),
-    "alive_hard": NoiseConfig(ball_missing_alive=0.45, ball_missing_dead=0.35),
-    "dead_dark":  NoiseConfig(ball_missing_alive=0.25, ball_missing_dead=0.85),
+    "alive_hard": NoiseConfig(ball_missing_alive=0.38, ball_missing_dead=0.55, gap_median_frames=180.0),
+    "dead_dark":  NoiseConfig(ball_missing_alive=0.15, ball_missing_dead=0.95, gap_median_frames=300.0),
 }
 
 

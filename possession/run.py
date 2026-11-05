@@ -61,7 +61,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--team", required=True, help="team name, used as the file name")
     ap.add_argument("--method", default="v2", choices=("v0", "v1", "v2"))
-    ap.add_argument("--no-tags", action="store_true", help="ignore the Smart Tagging file")
+    ap.add_argument("--use-tags", action="store_true", help="include Smart Tagging set-piece windows")
     args = ap.parse_args()
     t0 = time.time()
 
@@ -82,7 +82,7 @@ def main():
         codes = methods.v1_rules(match, f)
     else:
         tag_path = match.extra.get("smart_tagging")
-        use_tags = not args.no_tags and tag_path and os.path.exists(tag_path)
+        use_tags = args.use_tags and tag_path and os.path.exists(tag_path)
         if use_tags:
             tags = tagging.load_sportscode(tag_path, fps=match.fps)
             signs = bench.add_tags(match, f, tags)
