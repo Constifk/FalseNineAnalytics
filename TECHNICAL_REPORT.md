@@ -42,28 +42,34 @@ We built a deterministic, zero-leakage pipeline (`possession/`) trained and cros
 |---|---|---|
 | **Tactical ATD (`BAR-ATH_tactical_atd.xml/.txt`)** | **Used (Primary)** | Provides all 199,319 frames at 25 Hz, 46 player track slots, and raw ball coordinates. |
 | **`games.py` metadata (`half_video_blocks`, pitch $105.3 \times 68.0\text{ m}$)** | **Used** | Defines exact graded frame intervals (`[11185, 90651]` and `[110808, 190197]`) so non-graded frames are cleanly marked `X`, and supplies exact pitch dimensions for out-of-bounds detection. |
-| **Tactical Smart Tagging (`BAR-ATH_tactical_smart_tagging.xml`)** | **Tested & Dropped from default** | We built an unsupervised polarity calibrator (`possession/tagging.py`) that aligns phase codes with tracking-only possession estimates. However, diagnostic ablation revealed that feeding coarse 30–60 s tactical phase windows (`BUILD UP`, `DEFENDING IN ...`) into the emission model suppressed rapid turnovers and reduced predicted spell counts. Pure collective tracking (`v2`) generalized substantially better across both cross-validation and the pipeline check (`0.5200` vs `0.3314` `spellF1` on the 5-minute check). Set-piece windows remain available via `--use-tags`. |
-| **Broadcast ATD & Video / Tactical Homography** | **Dropped** | Tactical ATD has 100% frame coverage and valid pitch coordinates (`DATA.md`), whereas Broadcast ATD is unsynchronized and only 65.8% usable. Adding unsynchronized broadcast tracks introduced alignment noise without improving transition timing. |
+| **Tactical Smart Tagging (`BAR-ATH_tactical_smart_tagging.xml`)** | **Built, excluded from the default** | We built an unsupervised polarity calibrator (`possession/tagging.py`) that aligns phase codes with tracking-only possession estimates, and per-frame features for set-piece windows and phase team. They are excluded by default for reasons that do not depend on the provided game: (1) phase intervals are phases, not possessions — a phase can span one possession, stop short of one, or cover two (`DATA.md`); (2) the meaning of a phase's `Team` tag is not documented for every code, so its polarity has to be guessed; (3) the open training games have no Smart Tagging, so tag features can only be trained on our own simulation of tags (`tagging.simulate`), which encodes exactly those guesses. *Disclosure:* the question came up when the pipeline check on the public 5-minute window was run with and without tags (`0.3314` vs `0.5200` `spellF1`). That window is not a tuning set, and 17 possessions are far too few for a difference to be evidence, so the decision rests on (1)–(3), not on that number. Tags remain available via `--use-tags`. |
+| **Broadcast ATD & Video** | **Not used** | The tactical ATD covers 100% of frames and is the reference timeline, whereas the broadcast feed is not synchronised and has usable homography on 65.8% of its frames (`DATA.md`). We did not test it. |
+| **Tactical Homography** | **Not used** | The tactical ATD is already in pitch coordinates. The homography would only be needed for a video-based ball detector (Section 5). |
 
 ---
 
 ## 3. Training Data & Label-Free ATD Noise Calibration
 
 In strict compliance with `RULES.md`:
-- **Zero labels or constants from the challenge match** were used for training, hyperparameter selection, or threshold tuning.
+- **No labels from the provided game** were used for training, hyperparameter selection, or threshold tuning. The public 5-minute window was used only as a pipeline check (frames aligned, file well-formed).
+- **The only information taken from the provided game is label-free:** aggregate kinematic distributions of its tracking data, used to calibrate the noise simulator (below). `RULES.md` permits learning without human labels.
 - **Training corpus:** The three public Metrica Sports open games (`github.com/metrica-sports/sample-data`: `Sample_Game_1`, `Sample_Game_2`, `Sample_Game_3`), totalling ~420,000 frames across three full matches. Ground-truth `H`/`A`/`D`/`X` labels are derived mechanically from the open event streams (`possession/devgames.py`) following the exact rules in `CHALLENGE.md`.
 - **Realistic ATD Noise Simulation (`possession/noise.py`):** Clean open tracking data differs sharply from raw computer-vision ATD. Using a label-free diagnostic (`possession/diagnose.py`) that compares only aggregate kinematic distributions (gaps per minute, gap duration quantiles, and player speed quantiles), we discovered two critical physical properties of real ATD:
   1. **Ball dropouts occur in long contiguous bursts** (1.4 gaps/min, median gap 10.7 s, 90th percentile 33.8 s) rather than sub-second flickers.
   2. **Player trajectories are temporally smooth** (median player speed $1.54\text{ m/s}$, 10th percentile $0.71\text{ m/s}$ during stoppages). Over-jittering synthetic player positions inflates resting player speeds above $1.6\text{ m/s}$ and blinds the stoppage (`D`) detector.
-  Calibrating `NoiseConfig` (`gap_median_frames=250`, `player_jitter_m=0.04`, across three presets `mid`, `alive_hard`, `dead_dark`) matched the empirical ATD kinematics and lifted pipeline transfer performance from `0.344` to **`0.5200` `spellF1`** (and **`0.8370` `macroF1`**) on the public 5-minute pipeline check — more than **2.1x the official `baseline_smooth50` full-match floor (`0.2433`)**.
+  Calibrating `NoiseConfig` (`gap_median_frames=250`, `player_jitter_m=0.04`, across three presets `mid`, `alive_hard`, `dead_dark`) matched these label-free distributions (`python -m possession.diagnose` prints both side by side).
 
 ### Leave-One-Game-Out Benchmark (Open Metrica Games 1–3)
 
-| Method | Mean `spellF1` | Mean `macroF1` | Description |
-|---|---|---|---|
-| `v0` (Baseline reproduction) | `0.296` | `0.668` | Nearest player + $\pm 2\text{ s}$ majority vote (`baseline_smooth50`) |
-| `v1` (Rule-based memory) | `0.387` | `0.763` | Ball-control radius ($1.5\text{ m}$, $\ge 5$ frames) + collective slowdown stoppage rule |
-| **`v2` (Collective LogReg + Viterbi)** | **`0.507`** | **`0.858`** | **29 collective features + prior-corrected multinomial emissions + Viterbi decoding** |
+`python -m possession.bench --quick`: each open game is held out once; the model is trained on the other two, degraded with the calibrated `mid` noise preset, and the Viterbi costs are grid-searched on the training games only (grid `{8, 32}` for each cost). All three folds select the same costs (`switch=8`, `stop=32`, `start=32`), which are the ones used for the submission.
+
+| Method | Mean `spellF1` (min) | Mean `macroF1` | Predicted / true possessions | Description |
+|---|---|---|---|---|
+| `v0` (Baseline reproduction) | `0.293` (`0.287`) | `0.667` | 1,530 / 1,064 | Nearest player + $\pm 2\text{ s}$ majority vote (`baseline_smooth50`) |
+| `v1` (Rule-based memory) | `0.378` (`0.361`) | `0.770` | 975 / 1,064 | Ball-control radius ($1.5\text{ m}$, $\ge 5$ frames) + collective slowdown stoppage rule |
+| **`v2` (Collective LogReg + Viterbi)** | **`0.493`** (`0.485`) | **`0.857`** | 824 / 1,064 | **29 collective features + prior-corrected multinomial emissions + Viterbi decoding** |
+
+`v2` predicts about 23% fewer possessions than there are: it merges possessions across missed turnovers and short stoppages (Section 5).
 
 ---
 
@@ -80,6 +86,7 @@ In strict compliance with `RULES.md`:
 
 ## 5. Limitations & Future Work
 
+- **Too few possessions:** On the open games `v2` finds about 77% of the true number of possessions (824 of 1,064), so some turnovers and short stoppages are missed and two possessions merge into one.
 - **Long-occlusion turnovers:** When a turnover occurs inside a 15+ second ball-tracking dropout, the model relies on collective team shape (`x_diff_3s`, `wid_diff_3s`), which lags the exact touch by ~1–2 seconds and lowers IoU at the strictest `0.7` threshold.
 - **Set-piece execution frame precision:** Players often stand still for several seconds before a free kick or corner is struck; distinguishing the walk-up from the exact restart frame without ball visibility can shift the `D -> H/A` boundary by 10–20 frames.
 - **With more time:** We would run a lightweight pretrained ball detector locally on the 1080p tactical video specifically during the 40.7% ball-missing intervals to recover exact restart and interception timestamps.

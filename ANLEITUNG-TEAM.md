@@ -48,18 +48,21 @@ Sie muss auf den 5 öffentlichen Minuten so abschneiden, wie es in EVALUATION.md
 
 | Version | spellF1 Testspiele | Idee |
 |---|---|---|
-| v0 | 0,26 | offizielle Baseline nachgebaut (offiziell auf dem echten Spiel: 0,243) |
-| v1 | 0,39 | Regeln: Team behält den Ball, bis der Gegner ihn kontrolliert |
-| v2 | 0,51 | Zustandsmodell H/A/D, trainiert auf Testspielen mit künstlichem Rauschen |
+| v0 | 0,29 | offizielle Baseline nachgebaut (offiziell auf dem echten Spiel: 0,243) |
+| v1 | 0,38 | Regeln: Team behält den Ball, bis der Gegner ihn kontrolliert |
+| v2 | 0,49 | Zustandsmodell H/A/D, trainiert auf Testspielen mit künstlichem Rauschen |
+
+Neu gerechnet am 07.11. mit dem kalibrierten Rauschmodell (`python -m possession.bench --quick`).
 
 Ob das auf dem echten Spiel genauso aussieht, wissen wir erst nach der Abgabe. Es gibt keine
 Live-Rangliste.
 
 ## Ideen für Sonntag (ohne Programmieren)
 
-Schaut euch im Taktikvideo die ersten 5 Minuten neben `evaluation/gt/BAR-ATH_possession_gt_public.csv`
-an (Frame 11185 bis 18684, 25 Frames = 1 Sekunde) und schreibt **allgemeine Regeln** auf, keine
-Frame-Nummern:
+Schaut euch im Taktikvideo die ersten 5 Minuten mit der öffentlichen Musterlösung an (Frame 11185
+bis 18684, 25 Frames = 1 Sekunde). `python -m possession.srt` legt sie als Untertitel neben das Video
+(`data\tactical\BAR-ATH_tactical.srt`), VLC zeigt sie automatisch an. Mit Strg+T zu 00:07:27 springen,
+mit E geht es ein Bild weiter. Schreibt **allgemeine Regeln** auf, keine Frame-Nummern:
 
 1. Wann beginnt ein toter Ball genau: wenn der Ball über die Linie geht oder beim Pfiff?
 2. Wann endet er: wenn der Standard ausgeführt wird, oder schon vorher?
