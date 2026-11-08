@@ -3,7 +3,7 @@
 The rules forbid tuning on the challenge game, including on its public five minutes. So every
 choice in this package is made on Metrica's open sample games (github.com/metrica-sports/sample-data):
 
-  metrica1, metrica2   CSV format, already used by symmetrica
+  metrica1, metrica2   CSV format
   metrica3             FIFA/EPTS format -- the same format as the challenge ATD
 
 They are clean: one slot per real player and a ball on almost every live frame. noise.py turns

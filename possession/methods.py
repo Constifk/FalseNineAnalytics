@@ -2,7 +2,7 @@
 
   v0_baseline   the official baseline, re-implemented: nearest player, D without ball, majority
                 vote over +/- window frames
-  v1_rules      control with memory (from symmetrica), made robust to a missing ball: the team
+  v1_rules      control with memory, made robust to a missing ball: the team
                 keeps the ball while it is unseen, D comes from the ball leaving the pitch or
                 everybody slowing down
   v2_hmm        frame classifier (multinomial logistic regression on collective features) as the
