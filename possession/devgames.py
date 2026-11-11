@@ -27,7 +27,21 @@ from .match import AWAY, HOME, Match, D, X, load_epts
 ROOT = Path(__file__).resolve().parents[1]
 DEV_DIR = ROOT / "devdata"
 PITCH = (105.0, 68.0)
-BASE_URL = "https://raw.githubusercontent.com/metrica-sports/sample-data/master/data"
+# Pinned to a commit (the latest, 15.04.2021) and checked by sha256, so a fresh clone trains on
+# exactly the bytes we trained on.
+BASE_URL = ("https://raw.githubusercontent.com/metrica-sports/sample-data/"
+            "e706dd506b360d69d9d123d5b8026e7294b13996/data")
+SHA256 = {
+    "Sample_Game_1_RawEventsData.csv": "097dda6345e17390dca095331458fd00e47960c480c76f4356fd4edf2575ef05",
+    "Sample_Game_1_RawTrackingData_Away_Team.csv": "0a3df68a92af0290ede472e62de3b6489ddee29223da09bdf0cf76c8e0ab0618",
+    "Sample_Game_1_RawTrackingData_Home_Team.csv": "0a3d0eff7785950379c587d3597b86a2d91c2492281b4652e1abb97c99b6b364",
+    "Sample_Game_2_RawEventsData.csv": "edf31a18599265b77a8baf150f2ce6d89456fb0324b62ea7a391229657a619ba",
+    "Sample_Game_2_RawTrackingData_Away_Team.csv": "aa639f40762eade46c389020fe4458266b5ba14027b1e96e22e75db62803718b",
+    "Sample_Game_2_RawTrackingData_Home_Team.csv": "3f9990ac204b07133e4202441d6fcbb386897c7c7f81e1bc3ce4d35bc8644694",
+    "Sample_Game_3_events.json": "28a53bfe9eaf32535362335553d517cdce0eabb588af6166009081753751f4e0",
+    "Sample_Game_3_metadata.xml": "009c7dcfcb66192014917ca1559c158f612353e390eafb85f8214b06a1c7dec1",
+    "Sample_Game_3_tracking.txt": "570e6ce82c2d93bc92723af331d93c31110bec1d6dc0be07c6d44ca3f981d658",
+}
 
 OWNING = {"PASS", "CARRY", "RECOVERY", "SHOT", "SET PIECE"}
 
@@ -38,8 +52,6 @@ OWNING = {"PASS", "CARRY", "RECOVERY", "SHOT", "SET PIECE"}
 
 def download():
     """Fetch the three open games into devdata/ (about 200 MB, only what is missing)."""
-    from urllib.request import urlretrieve
-
     files = {
         "metrica1": [f"Sample_Game_1/Sample_Game_1_{p}.csv" for p in
                      ("RawEventsData", "RawTrackingData_Home_Team", "RawTrackingData_Away_Team")],
@@ -52,10 +64,30 @@ def download():
         folder = DEV_DIR / game
         folder.mkdir(parents=True, exist_ok=True)
         for name in names:
-            target = folder / Path(name).name
-            if not target.exists():
-                print("downloading", name)
-                urlretrieve(f"{BASE_URL}/{name}", target)
+            fetch(f"{BASE_URL}/{name}", folder / Path(name).name, SHA256[Path(name).name])
+
+
+def sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def fetch(url, target, digest):
+    """Download url to target unless it is already there; either way insist on the pinned hash."""
+    from urllib.request import urlretrieve
+
+    if not target.exists():
+        print("downloading", target.name)
+        tmp = target.with_name(target.name + ".part")
+        urlretrieve(url, tmp)
+        tmp.replace(target)
+    got = sha256(target)
+    if got != digest:
+        raise SystemExit(f"{target} has sha256 {got}, expected {digest} -- delete it and rerun")
 
 
 # ----------------------------------------------------------------------------------------------

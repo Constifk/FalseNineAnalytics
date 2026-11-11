@@ -140,7 +140,11 @@ class LogReg:
             m = 0.9 * m + 0.1 * g
             v = 0.999 * v + 0.001 * g * g
             W -= 0.05 * (m / (1 - 0.9 ** t)) / (np.sqrt(v / (1 - 0.999 ** t)) + 1e-8)
-        self.W = W
+        # Snap everything learnt to a fixed grid. BLAS and numpy's SIMD kernels differ between CPUs
+        # in the last bits (measured: 1e-15 on these weights); rounding removes that so a second
+        # machine reproduces the submission byte for byte (RULES.md).
+        self.mean_, self.std_ = np.round(self.mean_, 9), np.round(self.std_, 9)
+        self.W = np.round(W, 9)
         self.prior = Y.mean(0)
         return self
 
@@ -225,7 +229,7 @@ class V2:
 
     def emissions(self, f):
         lp = self.clf.log_proba(design(f))
-        return lp - np.log(self.clf.prior)
+        return np.round(lp - np.log(self.clf.prior), 6)   # same reason as in LogReg.fit
 
     def predict(self, match: Match, f=None, em=None):
         f = f or F.compute(match)
