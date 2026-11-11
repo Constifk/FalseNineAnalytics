@@ -14,6 +14,10 @@ counterpart in DATA.md, so the printout doubles as a loader check:
   tracked players per graded frame DATA.md: 20.5
   track slots                      DATA.md: 46
 Paste the printout, not the data.
+
+It deliberately does not score itself on the public 5-minute window: that window is not a tuning
+set (RULES.md), and a number printed on every run invites tuning on it. The format is checked by
+the official evaluation/validate_submission.py.
 """
 from __future__ import annotations
 
@@ -96,19 +100,10 @@ def main():
     path = os.path.join(ROOT, "out", f"{args.team}.csv")
     write_submission(path, codes)
     n_spells = len(score.spells(codes, match.runs))
-    digest = hashlib.sha256(open(path, "rb").read()).hexdigest()[:16]
+    digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
     print(f"wrote {os.path.relpath(path, ROOT)}  ({n_spells} possessions, sha256 {digest})")
-
-    gt_path = os.path.join(ROOT, "evaluation", "gt", "BAR-ATH_possession_gt_public.csv")
-    if os.path.exists(gt_path):
-        import pandas as pd
-        gt = pd.read_csv(gt_path)["label"].map({"H": 0, "A": 1, "D": 2, "X": 3}).to_numpy()
-        r = score.evaluate(gt, codes)
-        print(f"public 5 minutes (pipeline check only, NOT a score to tune on): "
-              f"spellF1 {r['spell_f1']:.4f}  macroF1 {r['macro_f1']:.4f}")
     print(f"done in {time.time() - t0:.0f}s")
     print("next: python evaluation/validate_submission.py", os.path.relpath(path, ROOT))
-    print("      python evaluation/run_evaluation.py   (copy the csv to evaluation/results/ first)")
 
 
 if __name__ == "__main__":

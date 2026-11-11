@@ -1,6 +1,6 @@
 # Anleitung fürs Team (Yang, Consti, Sascha)
 
-Stand 04.11.2026. Plan und Hintergrund: `yang-os/Work/more-than-a-hack/plan.md` (Yang schickt ihn rum).
+Stand 11.11.2026. Plan und Hintergrund: `yang-os/Work/more-than-a-hack/plan.md` (Yang schickt ihn rum).
 
 ## Die wichtigste Regel
 
@@ -11,6 +11,36 @@ die Skripte am Ende ausgeben (spellF1, macroF1, Anzahl Ballbesitzphasen).
 
 Außerdem: Nichts im Spiel von Hand labeln oder korrigieren, und auf den öffentlichen 5 Minuten nicht
 tunen. Video anschauen, um zu verstehen, ist erlaubt.
+
+## Mit KI arbeiten ohne Daten
+
+Ihr dürft mit Claude, ChatGPT, Codex oder Cursor am **Code** arbeiten. Die Grenze verläuft so:
+
+| Darf zur KI | Darf nie zur KI |
+|---|---|
+| alles unter `possession/`, `tests_team/`, die `.md`-Dateien | alles in `data\` (ATD, Smart Tagging, Video, Homographie) |
+| die offenen Testspiele in `devdata\` (Metrica, IDSSE/DFL) | alles in `out\` (unsere CSV ist aus den Daten abgeleitet) |
+| die Textausgabe von `possession.run`: Phasenzahl, sha256, die drei Lader-Zeilen | Zeilen, Ausschnitte oder Spaltenköpfe aus diesen Dateien |
+| Fehlermeldungen, **wenn** darin keine Datenzeilen stehen | Screenshots oder Clips aus dem Video, Plots vom echten Spiel |
+
+So geht ihr praktisch vor:
+
+1. **Code-Agent im Repo** (Claude Code, Codex, Cursor, Gemini CLI): Im Repo liegen Sperrdateien
+   (`.claude/settings.json`, `.cursorignore`, `.geminiignore`, `.aiexclude`), die `data\` und `out\`
+   ausschließen. Das ist ein Gurt, kein Schloss: Ein Agent mit Shell kann die Dateien trotzdem
+   mit `type` oder `python` öffnen. Sagt ihm deshalb am Anfang ausdrücklich: „`data/` und `out/`
+   nie öffnen, lesen oder ausgeben, auch nicht ausschnittsweise.“ Und lasst ihn **nie**
+   `possession.run` oder andere Skripte auf `data\` ausführen, denn dann landet die Ausgabe bei ihm.
+   Am sichersten liegen die Daten gar nicht im Repo: Paket z. B. nach `C:\mtah-daten` entpacken und
+   vor dem Lauf `$env:MTAH_DATA_DIR = "C:\mtah-daten"` setzen. Dann sieht ein Agent im Repo nichts.
+2. **Läufe auf den echten Daten macht ihr selbst** in PowerShell, ohne KI-Fenster daneben:
+   `.venv\Scripts\python -m possession.run --team FalseNineAnalytics`. An die KI geht nur die
+   Zeile mit Phasenzahl und sha256.
+3. **Fehler auf den echten Daten:** Den Traceback nur weitergeben, wenn keine Datenzeile darin steht
+   (bei Ladefehlern zeigt pandas manchmal eine Zeile an). Im Zweifel nur den Fehlertyp und die
+   Codezeile abschreiben.
+4. **Ideen testen** immer zuerst auf den offenen Testspielen: `python -m possession.bench --quick`.
+   Das ist die einzige Messung, die wir der KI zeigen und auf der wir tunen dürfen.
 
 ## Einmalig einrichten (Windows, PowerShell, im Ordner `mtah-2027`)
 

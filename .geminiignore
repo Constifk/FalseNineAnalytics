@@ -1,0 +1,3 @@
+# Challenge data and everything derived from it never go to an AI tool (RULES.md, FAQ.md).
+data/
+out/
