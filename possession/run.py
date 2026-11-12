@@ -40,10 +40,16 @@ TRAIN_PRESETS = ("mid", "alive_hard", "dead_dark")
 
 
 def train_model(tags):
-    devgames.download()
-    data = bench.prepare(TRAIN_PRESETS, tags=tags)
-    model = methods.V2(decode=DECODE).fit([(f, gt, m.runs) for m, gt, f in data.values()])
-    return model
+    devgames.download_all()
+
+    def samples():   # one game at a time, so only the sampled training rows stay in memory
+        for g in devgames.DEV_GAMES:
+            clean, gt = devgames.load(g)
+            for p in TRAIN_PRESETS:
+                m, f = bench.noisy(g, clean, gt, p, tags=tags)
+                yield f, gt, m.runs
+
+    return methods.V2(decode=DECODE).fit(samples())
 
 
 def load_challenge():

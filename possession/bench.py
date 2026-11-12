@@ -1,8 +1,9 @@
-"""Development benchmark: leave one open game out, train and tune on the other two, score the
+"""Development benchmark: leave one open game out, train and tune on the others, score the
 held-out one under every noise preset. Nothing here ever touches the challenge data.
 
     python -m possession.bench                 # all methods, all folds
     python -m possession.bench --quick         # one preset, smaller tuning grid
+    python -m possession.bench --quick --train metrica   # learn from the 3 Metrica games only
 """
 from __future__ import annotations
 
@@ -30,20 +31,26 @@ def add_tags(m, f, tags):
     return signs
 
 
-def prepare(presets, seeds=(0,), tags=False):
+def noisy(game, clean, gt, preset, s=0, tags=False):
+    """One degraded copy of an open game and its features; the seed depends only on the game's
+    place in DEV_GAMES, the preset's settings and s."""
+    seed = s + 17 * devgames.DEV_GAMES.index(game)
+    cfg = noise.NoiseConfig(**{**noise.PRESETS[preset].__dict__, "seed": seed})
+    m = noise.degrade(clean, gt, cfg)
+    f = features.compute(m)
+    if tags:
+        add_tags(m, f, tagging.simulate(gt, m.runs, seed=seed))
+    return m, f
+
+
+def prepare(presets, seeds=(0,), tags=False, games=devgames.DEV_GAMES):
     """{(game, preset, seed): (noisy match, gt, features)}"""
     out = {}
-    for g in devgames.DEV_GAMES:
+    for g in games:
         clean, gt = devgames.load(g)
         for p in presets:
             for s in seeds:
-                cfg = noise.PRESETS[p]
-                seed = s + 17 * devgames.DEV_GAMES.index(g)
-                cfg = noise.NoiseConfig(**{**cfg.__dict__, "seed": seed})
-                m = noise.degrade(clean, gt, cfg)
-                f = features.compute(m)
-                if tags:
-                    add_tags(m, f, tagging.simulate(gt, m.runs, seed=seed))
+                m, f = noisy(g, clean, gt, p, s, tags)
                 out[(g, p, s)] = (m, gt, f)
     return out
 
@@ -66,17 +73,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--out", default="out/bench.json")
+    ap.add_argument("--train", default="all", choices=("all", "metrica"),
+                    help="games the model may learn from; every game is still held out once")
     args = ap.parse_args()
 
     presets = ["mid"] if args.quick else list(noise.PRESETS)
     grid = {k: v[1::2] for k, v in GRID.items()} if args.quick else GRID
     t0 = time.time()
+    devgames.download_all()
     data = prepare(presets)
+    pool = devgames.DEV_GAMES if args.train == "all" else devgames.METRICA
     print(f"prepared {len(data)} noisy games in {time.time() - t0:.0f}s")
 
     rows = []
     for test in devgames.DEV_GAMES:
-        train = [v for (g, p, s), v in data.items() if g != test]
+        train = [v for (g, p, s), v in data.items() if g != test and g in pool]
         v2 = methods.V2().fit([(f, gt, m.runs) for m, gt, f in train])
         p, train_score = tune_decode(v2, train, grid)
         print(f"[{test}] tuned on train: {p}  spellF1 {train_score:.4f}")

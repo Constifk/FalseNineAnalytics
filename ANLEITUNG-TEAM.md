@@ -59,7 +59,8 @@ Datenpaket aus der Mail nach `data\` entpacken, so wie in `data\README.md` besch
 .venv\Scripts\python evaluation\validate_submission.py out\TEAMNAME.csv
 ```
 
-Das dauert ein paar Minuten. Beim ersten Mal werden die offenen Testspiele (~200 MB) geladen.
+Beim ersten Mal werden die offenen Testspiele geladen: 3 Metrica-Spiele (~200 MB) und 7 DFL-Spiele
+(~2,6 GB, Hugging Face lädt manchmal langsam, also Zeit einplanen). Danach dauert ein Lauf ein paar Minuten.
 Die Ausgabe (nur die Textzeilen) an Jarvis schicken. Die ersten drei Zeilen prüfen den Lader:
 Ball 59,3 % und 20,5 Spieler sind die offiziellen Werte aus DATA.md. Weicht es stark ab, stimmt
 etwas mit dem Einlesen nicht.
@@ -76,13 +77,16 @@ Sie muss auf den 5 öffentlichen Minuten so abschneiden, wie es in EVALUATION.md
 
 ## Wo wir stehen (gemessen nur auf offenen Testspielen, nicht auf dem Challenge-Spiel)
 
-| Version | spellF1 Testspiele | Idee |
-|---|---|---|
-| v0 | 0,29 | offizielle Baseline nachgebaut (offiziell auf dem echten Spiel: 0,243) |
-| v1 | 0,38 | Regeln: Team behält den Ball, bis der Gegner ihn kontrolliert |
-| v2 | 0,49 | Zustandsmodell H/A/D, trainiert auf Testspielen mit künstlichem Rauschen |
+| Version | Metrica (3 Spiele) | DFL (7 Spiele) | Idee |
+|---|---|---|---|
+| v0 | 0,29 | 0,25 | offizielle Baseline nachgebaut (offiziell auf dem echten Spiel: 0,243) |
+| v1 | 0,38 | 0,32 | Regeln: Team behält den Ball, bis der Gegner ihn kontrolliert |
+| v2 | 0,51 | 0,40 | Zustandsmodell H/A/D, trainiert auf Testspielen mit künstlichem Rauschen |
 
-Neu gerechnet am 07.11. mit dem kalibrierten Rauschmodell (`python -m possession.bench --quick`).
+Neu gerechnet am 12.11. (`python -m possession.bench --quick`, jedes Spiel einmal als Test, trainiert
+auf den anderen neun, Laufzeit ~50 Min.). Die DFL-Spiele sind der ehrlichere Maßstab: Die Baseline
+landet dort bei 0,25, fast genau wie offiziell auf dem echten Spiel. Größte Schwäche: v2 findet auf
+den DFL-Spielen nur 59 % der echten Ballbesitzphasen.
 
 Ob das auf dem echten Spiel genauso aussieht, wissen wir erst nach der Abgabe. Es gibt keine
 Live-Rangliste.

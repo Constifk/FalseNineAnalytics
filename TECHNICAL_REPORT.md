@@ -15,7 +15,7 @@ Optimizing for `spellF1` differs fundamentally from optimizing per-frame accurac
 3. **40.7% missing ball & anonymous tracklets:** The ball is absent on 40.7% of graded frames (disproportionately during duels, aerial balls, and stoppages), and players are represented by 46 anonymous, identity-swapping track slots (~20.5 active per frame).
 
 ### Three-Stage Architecture
-We built a deterministic, zero-leakage pipeline (`possession/`) trained and cross-validated exclusively on **open Metrica Sports matches (`Sample_Game_1`, `Sample_Game_2`, `Sample_Game_3`)** degraded through a calibrated Automatic Tracking Data (ATD) noise simulator:
+We built a deterministic, zero-leakage pipeline (`possession/`) trained and cross-validated exclusively on **ten open matches from other competitions** (the three Metrica Sports sample games and the seven DFL games of the IDSSE dataset), degraded through a calibrated Automatic Tracking Data (ATD) noise simulator:
 
 1. **Collective Spatio-Temporal Feature Extraction (`possession/features.py`):**
    Because track slots swap identities, all features are permutation-invariant across slots within each team:
@@ -53,23 +53,26 @@ We built a deterministic, zero-leakage pipeline (`possession/`) trained and cros
 In strict compliance with `RULES.md`:
 - **No labels from the provided game** were used for training, hyperparameter selection, or threshold tuning. The public 5-minute window was used only to check that frames are aligned and the file is well-formed (`evaluation/validate_submission.py`, `evaluation/run_evaluation.py` on the official baselines); `possession.run` does not score it.
 - **The only information taken from the provided game is label-free:** aggregate kinematic distributions of its tracking data, used to calibrate the noise simulator (below). `RULES.md` permits learning without human labels.
-- **Training corpus:** The three public Metrica Sports open games (`github.com/metrica-sports/sample-data`: `Sample_Game_1`, `Sample_Game_2`, `Sample_Game_3`), totalling ~420,000 frames across three full matches. Ground-truth `H`/`A`/`D`/`X` labels are derived mechanically from the open event streams (`possession/devgames.py`) following the exact rules in `CHALLENGE.md`.
+- **Training corpus (10 open games from other competitions):**
+  - The three Metrica Sports sample games (`github.com/metrica-sports/sample-data`, pinned to commit `e706dd5`). Ground-truth `H`/`A`/`D` labels are derived mechanically from the open event streams following the rules in `CHALLENGE.md` (`possession/devgames.py`).
+  - The seven DFL games (two Bundesliga, five 2. Bundesliga, 2022/23) of the IDSSE dataset: Bassek, Rein, Weber & Memmert (2025), *An integrated dataset of spatiotemporal and event data in elite soccer*, Scientific Data 12, 195, doi:10.1038/s41597-025-04505-y, licensed **CC BY 4.0**. Downloaded from the PySport mirror `huggingface.co/datasets/pysport/idsse-data` at a pinned revision (`possession/idsse.py`). Their position feed carries the tracking provider's `BallStatus` and `BallPossession` on every frame, so the labels are derived the way the challenge ground truth is: mechanically from ball status and possession flags, without smoothing (`D` where the ball is dead, otherwise the team in possession).
+  - Every downloaded file is checked against a pinned sha256.
 - **Realistic ATD Noise Simulation (`possession/noise.py`):** Clean open tracking data differs sharply from raw computer-vision ATD. Using a label-free diagnostic (`possession/diagnose.py`) that compares only aggregate kinematic distributions (gaps per minute, gap duration quantiles, and player speed quantiles), we discovered two critical physical properties of real ATD:
   1. **Ball dropouts occur in long contiguous bursts** (1.4 gaps/min, median gap 10.7 s, 90th percentile 33.8 s) rather than sub-second flickers.
   2. **Player trajectories are temporally smooth** (median player speed $1.54\text{ m/s}$, 10th percentile $0.71\text{ m/s}$ during stoppages). Over-jittering synthetic player positions inflates resting player speeds above $1.6\text{ m/s}$ and blinds the stoppage (`D`) detector.
   Calibrating `NoiseConfig` (`gap_median_frames=250`, `player_jitter_m=0.04`, across three presets `mid`, `alive_hard`, `dead_dark`) matched these label-free distributions (`python -m possession.diagnose` prints both side by side).
 
-### Leave-One-Game-Out Benchmark (Open Metrica Games 1–3)
+### Leave-One-Game-Out Benchmark (10 open games)
 
-`python -m possession.bench --quick`: each open game is held out once; the model is trained on the other two, degraded with the calibrated `mid` noise preset, and the Viterbi costs are grid-searched on the training games only (grid `{8, 32}` for each cost). All three folds select the same costs (`switch=8`, `stop=32`, `start=32`), which are the ones used for the submission.
+`python -m possession.bench --quick`: each of the ten open games is held out once; the model is trained on the other nine, all degraded with the calibrated `mid` noise preset, and the Viterbi costs are grid-searched on the training games only (grid `{8, 32}` for each cost). All ten folds select the same costs (`switch=8`, `stop=32`, `start=32`), which are the ones used for the submission.
 
-| Method | Mean `spellF1` (min) | Mean `macroF1` | Predicted / true possessions | Description |
-|---|---|---|---|---|
-| `v0` (Baseline reproduction) | `0.293` (`0.287`) | `0.667` | 1,530 / 1,064 | Nearest player + $\pm 2\text{ s}$ majority vote (`baseline_smooth50`) |
-| `v1` (Rule-based memory) | `0.378` (`0.361`) | `0.770` | 975 / 1,064 | Ball-control radius ($1.5\text{ m}$, $\ge 5$ frames) + collective slowdown stoppage rule |
-| **`v2` (Collective LogReg + Viterbi)** | **`0.493`** (`0.485`) | **`0.857`** | 824 / 1,064 | **29 collective features + prior-corrected multinomial emissions + Viterbi decoding** |
+| Method | Metrica games (3) `spellF1` | DFL games (7) `spellF1` (min) | DFL `macroF1` | DFL predicted / true possessions | Description |
+|---|---|---|---|---|---|
+| `v0` (Baseline reproduction) | `0.293` | `0.246` (`0.225`) | `0.651` | 3,161 / 3,061 | Nearest player + $\pm 2\text{ s}$ majority vote (`baseline_smooth50`) |
+| `v1` (Rule-based memory) | `0.378` | `0.320` (`0.249`) | `0.729` | 1,914 / 3,061 | Ball-control radius ($1.5\text{ m}$, $\ge 5$ frames) + collective slowdown stoppage rule |
+| **`v2` (Collective LogReg + Viterbi)** | **`0.508`** | **`0.398`** (`0.351`) | **`0.832`** | 1,811 / 3,061 | **29 collective features + prior-corrected multinomial emissions + Viterbi decoding** |
 
-`v2` predicts about 23% fewer possessions than there are: it merges possessions across missed turnovers and short stoppages (Section 5).
+Two observations. First, the baseline reproduction scores `0.246` on the degraded DFL games, close to the official baseline's `0.2433` on the provided game, so the DFL games under our noise model are a fair stand-in; the Metrica games are easier. Second, adding the DFL games to training did not move the mean over all ten held-out games (`0.431` trained on the Metrica games only, `0.431` trained on all; `python -m possession.bench --quick --train metrica`): the model is limited by its features, not by the amount of data. We still train on all ten games because the DFL labels are derived the way the challenge ground truth is. `v2` predicts only about 60% of the true number of possessions on the DFL games: it merges possessions across missed turnovers and short stoppages (Section 5).
 
 ---
 
@@ -86,7 +89,7 @@ In strict compliance with `RULES.md`:
 
 ## 5. Limitations & Future Work
 
-- **Too few possessions:** On the open games `v2` finds about 77% of the true number of possessions (824 of 1,064), so some turnovers and short stoppages are missed and two possessions merge into one.
+- **Too few possessions:** On the held-out games `v2` predicts 75% of the true number of possessions on the Metrica games (799 of 1,064) and 59% on the DFL games (1,811 of 3,061), so turnovers and short stoppages are missed and two possessions merge into one.
 - **Long-occlusion turnovers:** When a turnover occurs inside a 15+ second ball-tracking dropout, the model relies on collective team shape (`x_diff_3s`, `wid_diff_3s`), which lags the exact touch by ~1–2 seconds and lowers IoU at the strictest `0.7` threshold.
 - **Set-piece execution frame precision:** Players often stand still for several seconds before a free kick or corner is struck; distinguishing the walk-up from the exact restart frame without ball visibility can shift the `D -> H/A` boundary by 10–20 frames.
 - **With more time:** We would run a lightweight pretrained ball detector locally on the 1080p tactical video specifically during the 40.7% ball-missing intervals to recover exact restart and interception timestamps.
@@ -105,4 +108,6 @@ python -m venv .venv
 .venv\Scripts\python evaluation/validate_submission.py out/<team_name>.csv
 ```
 
-The pipeline automatically downloads the three open Metrica training games into `devdata/` (if not already cached), trains the model with fixed random seeds (`seed=0`), decodes the challenge match in ~2 minutes on CPU, and outputs a byte-for-byte identical `out/<team_name>.csv` (`199,319` rows, `sha256: ee1320615ea0cab0`).
+The pipeline downloads the ten open training games into `devdata/` on first use (about 2.8 GB, each file checked against a pinned sha256), trains the model with fixed seeds, decodes the challenge match in a few minutes on CPU, and writes `out/<team_name>.csv` (`199,319` rows) together with its sha256.
+
+**Byte-identical across machines.** BLAS and numpy's SIMD kernels differ between CPUs in the last bits; we measured differences of `1e-15` in the learnt weights between OpenBLAS kernels. The learnt parameters are therefore rounded to `1e-9` and the emission scores to `1e-6` before decoding, and the decoder is a scalar Python loop. On a stand-in bundle built from an open game (`python -m possession.fake_bundle`) the output is identical with the default kernels, with a forced old kernel (`OPENBLAS_CORETYPE=Prescott`, AVX2/AVX-512 disabled in numpy) and with different thread counts. Python 3.12 and the pinned `requirements-team.txt` are assumed.

@@ -93,3 +93,39 @@ def test_viterbi_follows_sustained_change():
     em[100:, A] = 1.0
     path = methods.viterbi(em, methods.DecodeParams(beta=1.0, switch=8, stop=8, start=8))
     assert np.all(path[:100] == H) and np.all(path[100:] == A)
+
+
+# ---- IDSSE loader --------------------------------------------------------------------------------
+
+def test_idsse_parse_synthetic(tmp_path, monkeypatch):
+    from possession import idsse
+
+    monkeypatch.setattr(idsse, "_dir", lambda: tmp_path)
+    mid = "J03WMX"
+    (tmp_path / idsse.file_name("info", mid)).write_text(
+        '<?xml version="1.0"?><PutDataRequest><MatchInformation>'
+        '<Environment PitchX="105.00" PitchY="68.00"/><Teams>'
+        '<Team TeamId="G" Role="guest"/><Team TeamId="Hm" Role="home"/>'
+        '</Teams></MatchInformation></PutDataRequest>', encoding="utf-8")
+
+    def frames(n0, n, extra=lambda i: ""):
+        return "".join(f'<Frame N="{n0 + i}" T="t" X="{i * 0.1:.2f}" Y="-1.00" S="0.00"{extra(i)}/>'
+                       for i in range(n))
+
+    ball = lambda i: f' Z="0.1" M="1" BallPossession="{1 if i < 3 else 2}" BallStatus="{0 if i == 0 else 1}"'
+    xml = ('<?xml version="1.0"?><PutDataRequest><Positions>'
+           f'<FrameSet GameSection="firstHalf" MatchId="x" TeamId="referee" PersonId="R">{frames(10000, 5)}</FrameSet>'
+           f'<FrameSet GameSection="firstHalf" MatchId="x" TeamId="Hm" PersonId="P1">{frames(10000, 5)}</FrameSet>'
+           f'<FrameSet GameSection="firstHalf" MatchId="x" TeamId="G" PersonId="P2">{frames(10001, 4)}</FrameSet>'
+           f'<FrameSet GameSection="firstHalf" MatchId="x" TeamId="BALL" PersonId="B">{frames(10000, 5, ball)}</FrameSet>'
+           f'<FrameSet GameSection="secondHalf" MatchId="x" TeamId="BALL" PersonId="B">{frames(100000, 2, ball)}</FrameSet>'
+           '</Positions></PutDataRequest>')
+    (tmp_path / idsse.file_name("positions", mid)).write_text(xml, encoding="utf-8")
+
+    m, gt = idsse.load(mid)
+    assert m.runs == [(0, 5), (5 + idsse.HALF_GAP, 7 + idsse.HALF_GAP)]
+    assert list(m.team) == [HOME, AWAY]                       # referee dropped, home first
+    assert list(gt[:5]) == [D, H, H, A, A]
+    assert gt[5] == X and list(gt[m.runs[1][0]:m.runs[1][1]]) == [D, H]
+    assert np.isnan(m.px[0, 1]) and abs(m.px[2, 1] - (0.1 + 52.5)) < 1e-4   # centre -> corner origin
+    assert abs(m.py[0, 0] - 33.0) < 1e-4

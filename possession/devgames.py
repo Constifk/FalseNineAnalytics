@@ -51,7 +51,7 @@ OWNING = {"PASS", "CARRY", "RECOVERY", "SHOT", "SET PIECE"}
 # ----------------------------------------------------------------------------------------------
 
 def download():
-    """Fetch the three open games into devdata/ (about 200 MB, only what is missing)."""
+    """Fetch the three Metrica games into devdata/ (about 200 MB, only what is missing)."""
     files = {
         "metrica1": [f"Sample_Game_1/Sample_Game_1_{p}.csv" for p in
                      ("RawEventsData", "RawTrackingData_Home_Team", "RawTrackingData_Away_Team")],
@@ -82,7 +82,7 @@ def fetch(url, target, digest):
 
     if not target.exists():
         print("downloading", target.name)
-        tmp = target.with_name(target.name + ".part")
+        tmp = target.with_name(target.name + ".download")
         urlretrieve(url, tmp)
         tmp.replace(target)
     got = sha256(target)
@@ -239,10 +239,24 @@ def load_epts_game():
 
 
 def load(name):
-    """('metrica1' | 'metrica2' | 'metrica3') -> (clean Match, ground-truth codes)."""
+    """('metrica1'..'metrica3' | 'idsse_<match id>') -> (clean Match, ground-truth codes)."""
+    if name.startswith("idsse_"):
+        from . import idsse
+        return idsse.load(name[len("idsse_"):])
     if name == "metrica3":
         return load_epts_game()
     return load_csv_game(int(name[-1]))
 
 
-DEV_GAMES = ("metrica1", "metrica2", "metrica3")
+METRICA = ("metrica1", "metrica2", "metrica3")
+IDSSE = ("idsse_J03WMX", "idsse_J03WN1", "idsse_J03WOH", "idsse_J03WOY", "idsse_J03WPY",
+         "idsse_J03WQQ", "idsse_J03WR9")
+DEV_GAMES = METRICA + IDSSE   # the order fixes each game's noise seed (bench.prepare)
+
+
+def download_all(games=None):
+    games = DEV_GAMES if games is None else games
+    download()
+    if any(g.startswith("idsse_") for g in games):
+        from . import idsse
+        idsse.download()
