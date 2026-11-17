@@ -39,11 +39,12 @@ DECODE = methods.DecodeParams(beta=1.0, switch=8.0, stop=32.0, start=32.0)
 TRAIN_PRESETS = ("mid", "alive_hard", "dead_dark")
 
 
-def train_model(tags):
-    devgames.download_all()
+def train_model(tags, pool=None):
+    pool = devgames.DEV_GAMES if pool is None else pool
+    devgames.download_all(pool)
 
     def samples():   # one game at a time, so only the sampled training rows stay in memory
-        for g in devgames.DEV_GAMES:
+        for g in pool:
             clean, gt = devgames.load(g)
             for p in TRAIN_PRESETS:
                 m, f = bench.noisy(g, clean, gt, p, tags=tags)
@@ -72,6 +73,8 @@ def main():
     ap.add_argument("--team", required=True, help="team name, used as the file name")
     ap.add_argument("--method", default="v2", choices=("v0", "v1", "v2"))
     ap.add_argument("--use-tags", action="store_true", help="include Smart Tagging set-piece windows")
+    ap.add_argument("--train", default="all", choices=("all", "metrica"),
+                    help="training games: all ten open games (~2.8 GB download) or the 3 Metrica games (~200 MB)")
     args = ap.parse_args()
     t0 = time.time()
 
@@ -99,7 +102,8 @@ def main():
             n_flip = sum(1 for v in signs.values() if v < 0)
             print(f"smart tagging: {len(tags)} instances, {len(signs)} phase codes, "
                   f"{n_flip} read as naming the defending side")
-        codes = train_model(bool(use_tags)).predict(match, f)
+        pool = devgames.DEV_GAMES if args.train == "all" else devgames.METRICA
+        codes = train_model(bool(use_tags), pool).predict(match, f)
     codes = np.where(graded, codes, X).astype(np.int8)
 
     os.makedirs(os.path.join(ROOT, "out"), exist_ok=True)

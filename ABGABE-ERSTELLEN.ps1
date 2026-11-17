@@ -54,9 +54,9 @@ try {
     & $V -m pip install --disable-pip-version-check -q -r requirements-team.txt
     if ($LASTEXITCODE -ne 0) { throw "pip install fehlgeschlagen" }
 
-    # 4. Abgabe erzeugen (laedt beim ersten Mal ~2,8 GB offene Trainingsspiele)
-    Step "4/6 Abgabe erzeugen (beim ersten Mal 30-60 Minuten wegen Download)"
-    & $V -m possession.run --team $Team
+    # 4. Abgabe erzeugen (laedt beim ersten Mal ~200 MB offene Trainingsspiele)
+    Step "4/6 Abgabe erzeugen (einige Minuten)"
+    & $V -m possession.run --team $Team --train metrica
     if ($LASTEXITCODE -ne 0) { throw "possession.run fehlgeschlagen" }
 
     # 5. Offizielle Pruefung

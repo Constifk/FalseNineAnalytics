@@ -4,7 +4,7 @@
 
 **Team:** FalseNineAnalytics  
 **Code:** https://github.com/Constifk/FalseNineAnalytics  
-**Submission file:** `FalseNineAnalytics.csv` (199,319 rows), produced by `python -m possession.run --team FalseNineAnalytics`
+**Submission file:** `FalseNineAnalytics.csv` (199,319 rows), produced by `python -m possession.run --team FalseNineAnalytics --train metrica`
 
 ---
 
@@ -19,7 +19,7 @@ Optimizing for `spellF1` differs fundamentally from optimizing per-frame accurac
 3. **40.7% missing ball & anonymous tracklets:** The ball is absent on 40.7% of graded frames (disproportionately during duels, aerial balls, and stoppages), and players are represented by 46 anonymous, identity-swapping track slots (~20.5 active per frame).
 
 ### Three-Stage Architecture
-We built a deterministic, zero-leakage pipeline (`possession/`) trained and cross-validated exclusively on **ten open matches from other competitions** (the three Metrica Sports sample games and the seven DFL games of the IDSSE dataset), degraded through a calibrated Automatic Tracking Data (ATD) noise simulator:
+We built a deterministic, zero-leakage pipeline (`possession/`) developed and cross-validated exclusively on **ten open matches from other competitions** (the three Metrica Sports sample games and the seven DFL games of the IDSSE dataset), degraded through a calibrated Automatic Tracking Data (ATD) noise simulator. The submitted model is trained on the three Metrica games (`--train metrica`, see Section 3 for why):
 
 1. **Collective Spatio-Temporal Feature Extraction (`possession/features.py`):**
    Because track slots swap identities, all features are permutation-invariant across slots within each team:
@@ -59,7 +59,7 @@ We built a deterministic, zero-leakage pipeline (`possession/`) trained and cros
 | Rule | How we comply |
 |---|---|
 | No hand labels, human-produced data or manually created data on the provided game | None used. Every label in the submission comes out of `possession.run`. Nobody labelled or corrected any frame of the provided game. |
-| No training, fitting or calibrating on the ground truth or on the provided video | The classifier weights and the Viterbi costs are fit **only on the ten external games**. The public 5-minute ground truth is never read by `possession.run`; the video is not an input. |
+| No training, fitting or calibrating on the ground truth or on the provided video | The classifier weights are fit **only on external games** (the three Metrica games for the submission) and the Viterbi costs were selected on the ten external games. The public 5-minute ground truth is never read by `possession.run`; the video is not an input. |
 | Tuning only on external data | The only free parameters (Viterbi costs, regularisation) are grid-searched on the external games (leave-one-game-out, Section 3). |
 | No checking of the output against the video | Not done. |
 | No upload of the provided data to AI services | The provided data never left the team's own machines. AI coding assistants were used on the code only; the repository ships exclusion files (`.claude/settings.json`, `.cursorignore`, `.geminiignore`, `.aiexclude`) for `data/` and `out/`. |
@@ -72,7 +72,7 @@ We built a deterministic, zero-leakage pipeline (`possession/`) trained and cros
 In strict compliance with `RULES.md`:
 - **No labels from the provided game** were used for training, hyperparameter selection, or threshold tuning. The public 5-minute window was used only to check that frames are aligned and the file is well-formed (`evaluation/validate_submission.py`, `evaluation/run_evaluation.py` on the official baselines); `possession.run` does not score it.
 - **The only information taken from the provided game is label-free:** aggregate kinematic distributions of its tracking data, used to calibrate the noise simulator (below). `RULES.md` permits learning without human labels.
-- **Training corpus (10 open games from other competitions):**
+- **Development corpus (10 open games from other competitions; the submission model is trained on the first three):**
   - The three Metrica Sports sample games (`github.com/metrica-sports/sample-data`, pinned to commit `e706dd5`). Ground-truth `H`/`A`/`D` labels are derived mechanically from the open event streams following the rules in `CHALLENGE.md` (`possession/devgames.py`).
   - The seven DFL games (two Bundesliga, five 2. Bundesliga, 2022/23) of the IDSSE dataset: Bassek, Rein, Weber & Memmert (2025), *An integrated dataset of spatiotemporal and event data in elite soccer*, Scientific Data 12, 195, doi:10.1038/s41597-025-04505-y, licensed **CC BY 4.0**. Downloaded from the PySport mirror `huggingface.co/datasets/pysport/idsse-data` at a pinned revision (`possession/idsse.py`). Their position feed carries the tracking provider's `BallStatus` and `BallPossession` on every frame, so the labels are derived the way the challenge ground truth is: mechanically from ball status and possession flags, without smoothing (`D` where the ball is dead, otherwise the team in possession).
   - Every downloaded file is checked against a pinned sha256.
@@ -91,7 +91,7 @@ In strict compliance with `RULES.md`:
 | `v1` (Rule-based memory) | `0.378` | `0.320` (`0.249`) | `0.729` | 1,914 / 3,061 | Ball-control radius ($1.5\text{ m}$, $\ge 5$ frames) + collective slowdown stoppage rule |
 | **`v2` (Collective LogReg + Viterbi)** | **`0.508`** | **`0.398`** (`0.351`) | **`0.832`** | 1,811 / 3,061 | **29 collective features + prior-corrected multinomial emissions + Viterbi decoding** |
 
-Two observations. First, the baseline reproduction scores `0.246` on the degraded DFL games, close to the official baseline's `0.2433` on the provided game, so the DFL games under our noise model are a fair stand-in; the Metrica games are easier. Second, adding the DFL games to training did not move the mean over all ten held-out games (`0.431` trained on the Metrica games only, `0.431` trained on all; `python -m possession.bench --quick --train metrica`): the model is limited by its features, not by the amount of data. We still train on all ten games because the DFL labels are derived the way the challenge ground truth is. `v2` predicts only about 60% of the true number of possessions on the DFL games: it merges possessions across missed turnovers and short stoppages (Section 5).
+Two observations. First, the baseline reproduction scores `0.246` on the degraded DFL games, close to the official baseline's `0.2433` on the provided game, so the DFL games under our noise model are a fair stand-in; the Metrica games are easier. Second, adding the DFL games to training did not move the mean over all ten held-out games (`0.431` trained on the Metrica games only, `0.431` trained on all; `python -m possession.bench --quick --train metrica`): the model is limited by its features, not by the amount of data. Because the two training pools are equivalent on all ten held-out games, the submitted file is produced with the smaller pool (`--train metrica`, ~200 MB of downloads instead of ~2.8 GB), which makes reproduction much faster; `--train all` remains available. This choice was made on the open-game benchmark only, never on the provided game. `v2` predicts only about 60% of the true number of possessions on the DFL games: it merges possessions across missed turnovers and short stoppages (Section 5).
 
 ---
 
@@ -123,12 +123,12 @@ From a clean clone of the repository with the official data bundle unpacked in `
 python -m venv .venv
 # Windows PowerShell:
 .venv\Scripts\python -m pip install -r requirements-team.txt
-.venv\Scripts\python -m possession.run --team FalseNineAnalytics
+.venv\Scripts\python -m possession.run --team FalseNineAnalytics --train metrica
 .venv\Scripts\python evaluation/validate_submission.py out/FalseNineAnalytics.csv
 ```
 
 On Windows, `ABGABE-ERSTELLEN.bat` runs the same steps end to end (Python 3.12 setup, data placement via `possession.unpack`, run, official validation).
 
-The pipeline downloads the ten open training games into `devdata/` on first use (about 2.8 GB, each file checked against a pinned sha256), trains the model with fixed seeds, decodes the challenge match in a few minutes on CPU, and writes `out/FalseNineAnalytics.csv` (`199,319` rows) together with its sha256.
+With `--train metrica` the pipeline downloads the three Metrica training games into `devdata/` on first use (about 200 MB, each file checked against a pinned sha256; `--train all` adds the seven DFL games, about 2.8 GB), trains the model with fixed seeds, decodes the challenge match in a few minutes on CPU, and writes `out/FalseNineAnalytics.csv` (`199,319` rows) together with its sha256.
 
 **Byte-identical across machines.** BLAS and numpy's SIMD kernels differ between CPUs in the last bits; we measured differences of `1e-15` in the learnt weights between OpenBLAS kernels. The learnt parameters are therefore rounded to `1e-9` and the emission scores to `1e-6` before decoding, and the decoder is a scalar Python loop. On a stand-in bundle built from an open game (`python -m possession.fake_bundle`) the output is identical with the default kernels, with a forced old kernel (`OPENBLAS_CORETYPE=Prescott`, AVX2/AVX-512 disabled in numpy) and with different thread counts. Python 3.12 and the pinned `requirements-team.txt` are assumed.
