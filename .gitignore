@@ -69,3 +69,9 @@ devdata/
 out/
 HANDOFF.md
 .claude/settings.local.json
+
+# -- local submission helper (ABGABE-ERSTELLEN.bat) ---------------------------------------------
+DATEN-HIER-REIN/*
+!DATEN-HIER-REIN/LIESMICH.txt
+ZUM-HOCHLADEN/
+ABGABE-LOG.txt

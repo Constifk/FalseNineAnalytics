@@ -4,7 +4,11 @@
       "Read(./data/**)",
       "Edit(./data/**)",
       "Read(./out/**)",
-      "Edit(./out/**)"
+      "Edit(./out/**)",
+      "Read(./DATEN-HIER-REIN/**)",
+      "Edit(./DATEN-HIER-REIN/**)",
+      "Read(./ZUM-HOCHLADEN/**)",
+      "Edit(./ZUM-HOCHLADEN/**)"
     ]
   }
 }

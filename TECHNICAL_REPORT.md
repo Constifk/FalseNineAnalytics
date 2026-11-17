@@ -2,6 +2,10 @@
 
 **More Than a Hack 2027 — Initial Challenge Technical Document**
 
+**Team:** FalseNineAnalytics  
+**Code:** https://github.com/Constifk/FalseNineAnalytics  
+**Submission file:** `FalseNineAnalytics.csv` (199,319 rows), produced by `python -m possession.run --team FalseNineAnalytics`
+
 ---
 
 ## 1. The Approach
@@ -49,6 +53,21 @@ We built a deterministic, zero-leakage pipeline (`possession/`) trained and cros
 ---
 
 ## 3. Training Data & Label-Free ATD Noise Calibration
+
+### Compliance summary (`RULES.md` and the organisers' clarification email of 3 November 2026)
+
+| Rule | How we comply |
+|---|---|
+| No hand labels, human-produced data or manually created data on the provided game | None used. Every label in the submission comes out of `possession.run`. Nobody labelled or corrected any frame of the provided game. |
+| No training, fitting or calibrating on the ground truth or on the provided video | The classifier weights and the Viterbi costs are fit **only on the ten external games**. The public 5-minute ground truth is never read by `possession.run`; the video is not an input. |
+| Tuning only on external data | The only free parameters (Viterbi costs, regularisation) are grid-searched on the external games (leave-one-game-out, Section 3). |
+| No checking of the output against the video | Not done. |
+| No upload of the provided data to AI services | The provided data never left the team's own machines. AI coding assistants were used on the code only; the repository ships exclusion files (`.claude/settings.json`, `.cursorignore`, `.geminiignore`, `.aiexclude`) for `data/` and `out/`. |
+| Licensed external data | Metrica sample data (repository licence) and IDSSE/DFL (CC BY 4.0), each pinned by commit and sha256. |
+
+*Disclosure on the noise simulator.* The synthetic degradation applied to the external games was matched to **label-free aggregate statistics of the provided tracking data** (ball-gap frequency and duration quantiles, player-speed quantiles; `possession/diagnose.py`). No ground truth, no video and no frame-level information enters this step, and the model itself is still fit only on external games. We list it explicitly because it is the one place where the provided game informs a setting, so the organisers can judge it.
+
+### Details
 
 In strict compliance with `RULES.md`:
 - **No labels from the provided game** were used for training, hyperparameter selection, or threshold tuning. The public 5-minute window was used only to check that frames are aligned and the file is well-formed (`evaluation/validate_submission.py`, `evaluation/run_evaluation.py` on the official baselines); `possession.run` does not score it.
@@ -104,10 +123,12 @@ From a clean clone of the repository with the official data bundle unpacked in `
 python -m venv .venv
 # Windows PowerShell:
 .venv\Scripts\python -m pip install -r requirements-team.txt
-.venv\Scripts\python -m possession.run --team <team_name>
-.venv\Scripts\python evaluation/validate_submission.py out/<team_name>.csv
+.venv\Scripts\python -m possession.run --team FalseNineAnalytics
+.venv\Scripts\python evaluation/validate_submission.py out/FalseNineAnalytics.csv
 ```
 
-The pipeline downloads the ten open training games into `devdata/` on first use (about 2.8 GB, each file checked against a pinned sha256), trains the model with fixed seeds, decodes the challenge match in a few minutes on CPU, and writes `out/<team_name>.csv` (`199,319` rows) together with its sha256.
+On Windows, `ABGABE-ERSTELLEN.bat` runs the same steps end to end (Python 3.12 setup, data placement via `possession.unpack`, run, official validation).
+
+The pipeline downloads the ten open training games into `devdata/` on first use (about 2.8 GB, each file checked against a pinned sha256), trains the model with fixed seeds, decodes the challenge match in a few minutes on CPU, and writes `out/FalseNineAnalytics.csv` (`199,319` rows) together with its sha256.
 
 **Byte-identical across machines.** BLAS and numpy's SIMD kernels differ between CPUs in the last bits; we measured differences of `1e-15` in the learnt weights between OpenBLAS kernels. The learnt parameters are therefore rounded to `1e-9` and the emission scores to `1e-6` before decoding, and the decoder is a scalar Python loop. On a stand-in bundle built from an open game (`python -m possession.fake_bundle`) the output is identical with the default kernels, with a forced old kernel (`OPENBLAS_CORETYPE=Prescott`, AVX2/AVX-512 disabled in numpy) and with different thread counts. Python 3.12 and the pinned `requirements-team.txt` are assumed.

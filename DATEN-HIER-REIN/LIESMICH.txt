@@ -1,0 +1,3 @@
+Hier die Dateien aus dem Google-Drive-Ordner ablegen (mindestens BAR-ATH_tactical_atd.xml und BAR-ATH_tactical_atd.txt, ZIPs gehen auch).
+Dann ABGABE-ERSTELLEN.bat doppelklicken.
+Diese Dateien niemals in ein KI-Tool hochladen und niemals ins Repo committen.
