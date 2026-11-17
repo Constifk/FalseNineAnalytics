@@ -35,6 +35,17 @@ try {
     $atdTxt = Join-Path $Root "data\tactical\BAR-ATH_tactical_atd.txt"
     $atdXml = Join-Path $Root "data\tactical\BAR-ATH_tactical_atd.xml"
     $inbox = Join-Path $Root "DATEN-HIER-REIN"
+    New-Item -ItemType Directory -Force -Path (Join-Path $Root "data\tactical") | Out-Null
+    # Auch direkt im Downloads-Ordner nach den Tracking-Dateien suchen (z. B. BAR-ATH_tactical_atd.txt
+    # oder mit Drive-Nummer BAR-ATH_tactical_atd-001.txt) und sie nach data\tactical kopieren.
+    $dl = Join-Path $env:USERPROFILE "Downloads"
+    foreach ($pair in @(@("txt", $atdTxt), @("xml", $atdXml))) {
+        if (-not (Test-Path $pair[1])) {
+            $hit = Get-ChildItem $inbox, $dl -Filter "BAR-ATH_tactical_atd*.$($pair[0])" -ErrorAction SilentlyContinue |
+                   Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($hit) { Copy-Item $hit.FullName $pair[1]; Write-Host "kopiert: $($hit.Name)" }
+        }
+    }
     if (-not ((Test-Path $atdTxt) -and (Test-Path $atdXml))) {
         $items = @(Get-ChildItem $inbox -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "LIESMICH.txt" })
         if ($items.Count -eq 0) {
